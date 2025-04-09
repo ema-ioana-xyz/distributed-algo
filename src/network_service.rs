@@ -22,8 +22,12 @@ impl NetworkService {
         let server = TcpListener::bind(listening_socket).unwrap();
         let thread = thread::spawn(move || {
             for stream in server.incoming() {
-                let mut stream = stream.unwrap();
-                Self::receive(&mut stream, queue.clone());
+                match stream {
+                    Ok(mut stream) => {
+                        Self::receive(&mut stream, queue.clone());
+                    }
+                    Err(e) => { eprintln!("Server connection accept failed; {}", e)}
+                }
             }
         });
         thread
@@ -81,7 +85,7 @@ impl NetworkService {
             Duration::new(10, 0)
         ) {
             Ok(val) => val,
-            Err(err) => panic!("{}", err)
+            Err(err) => panic!("Connecting to {} failed; {}", destination, err)
         };
         Self::write_message_length(&mut connection, message.len());
         connection.write_all(message).unwrap();
