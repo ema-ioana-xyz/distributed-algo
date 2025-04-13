@@ -1,12 +1,13 @@
 mod network_service;
 mod messaging;
+mod client;
 
-use std::collections::VecDeque;
-use std::env;
+use std::{env, thread};
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc::channel;
 use network_service::NetworkService;
 use uuid::Uuid;
+use crate::client::Client;
 use crate::protobuf::message::Type;
 
 type Envelope = protobuf::Message;
@@ -24,24 +25,38 @@ fn main() {
     let options = set_config();
     println!("Hub address is: {}", options.hub_address);
 
-    let message_queue: VecDeque<Envelope> = VecDeque::new();
     let mut server_threads = Vec::with_capacity(3);
-    let queue_arc = Arc::from(Mutex::from(message_queue));
+    let mut client_threads = Vec::with_capacity(3);
 
     for index in 0..3 {
+        let node_socket = options.own_addresses[index];
+
+        // Create message queue for current node
+        let (tx, rx)  = channel();
+
         let server_thread = NetworkService::start_listener(
-            &options.own_addresses[index], queue_arc.clone()
+            &options.own_addresses[index], tx.clone()
         );
         server_threads.push(server_thread);
 
+        // Start client for current node
+        let mut client = Client::new(rx, tx, node_socket.port());
+        let client_thread = thread::spawn(move || {
+            client.start_worker()
+        });
+        client_threads.push(client_thread);
+
         // Register the new node with the Hub
         let connection_message = make_connection_message((index + 1) as u8, &options.hub_address);
-        NetworkService::send(&options.hub_address, connection_message, options.own_addresses[index].port());
+        NetworkService::send(&options.hub_address, connection_message, node_socket.port());
     }
 
     // Join server threads before exiting
     for thread in server_threads {
         thread.join().expect("Joining server threads with the main one should not cause a panic");
+    }
+    for thread in client_threads {
+        thread.join().expect("Joining client threads with the main one should not cause a panic");
     }
 }
 

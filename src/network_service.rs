@@ -1,7 +1,6 @@
-use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -14,10 +13,9 @@ use crate::protobuf::message::Type;
 
 pub struct NetworkService {
 }
-type MessageQueue = Arc<Mutex<VecDeque<Envelope>>>;
 
 impl NetworkService {
-    pub fn start_listener(listening_socket: &SocketAddr, queue: MessageQueue) -> JoinHandle<()> {
+    pub fn start_listener(listening_socket: &SocketAddr, queue: Sender<Envelope>) -> JoinHandle<()> {
         // Open TCP Listener socket
         let server = TcpListener::bind(listening_socket).unwrap();
         let thread = thread::spawn(move || {
@@ -34,16 +32,28 @@ impl NetworkService {
     }
 
     // Read a NetworkMessage over a TCP connection, and transform it into a PL message
-    fn receive(connection: &mut TcpStream, queue: MessageQueue) {
+    fn receive(connection: &mut TcpStream, queue: Sender<Envelope>) {
         let message_buffer = Self::read(connection);
-        let envelope = protobuf::Message::decode(message_buffer).unwrap();
+        let envelope = match Envelope::decode(message_buffer) {
+            Ok(val) => val,
+            Err(err) => panic!("Failed to decode message from {:?}; {}", connection.peer_addr(), err)
+        };
 
         if envelope.r#type() != Type::NetworkMessage {
             eprintln!("Received a message from the network that is not a NetworkMessage");
             return;
         }
 
-        let payload = envelope.network_message.unwrap().message.unwrap();
+        let net_msg = match envelope.network_message {
+            Some(val) => val,
+            None => panic!("Message from {:?} field NetworkMessage is not populated", connection.peer_addr())
+        };
+
+        let payload = match net_msg.message {
+            Some(val) => val,
+            None => panic!("Message from {:?} has a NetworkMessage but contains no inner message", connection.peer_addr())
+        };
+
         let mut pl_deliver = protobuf::PlDeliver::default();
         pl_deliver.message = Option::from(payload);
 
@@ -53,7 +63,10 @@ impl NetworkService {
 
         println!("Got message: {}", to_be_added.message_uuid);
 
-        queue.lock().unwrap().push_back(to_be_added);
+        match queue.send(to_be_added) {
+            Ok(_) => {},
+            Err(err) => panic!("[{:?}] Could not add received message to internal queue", connection.local_addr())
+        };
     }
 
     /// Transform a PL message into a NetworkMessage, and send it over to a host via TCP
@@ -99,13 +112,20 @@ impl NetworkService {
 
     fn read(connection: &mut TcpStream) -> Bytes {
         let length = Self::read_message_length(connection);
-        let mut buffer  = BytesMut::with_capacity(length as usize);
-        connection.read_exact(&mut *buffer).expect("TODO: panic message");
+        let mut buffer  = BytesMut::zeroed(length as usize);
+
+        match connection.read_exact(&mut *buffer) {
+            Ok(_) => {},
+            Err(err) => panic!(
+                "Failed reading {} octets from {:?}; {}",
+                length, connection.peer_addr(), err
+            ),
+        };
         buffer.freeze()
     }
 
     fn read_message_length(connection: &mut TcpStream) -> u32 {
-        connection.read_u32::<NetworkEndian>().expect("TODO: yeah, handle this some day")
+        connection.read_i32::<NetworkEndian>().expect("TODO: yeah, handle this some day") as u32
     }
 
     fn wrap_envelope_contents<T>(contents: T) -> Option<Box<T>> {
