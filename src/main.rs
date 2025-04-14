@@ -40,7 +40,7 @@ fn main() {
         server_threads.push(server_thread);
 
         // Start client for current node
-        let mut client = Client::new(rx, tx, node_socket.port());
+        let mut client = Client::new(rx, tx, node_socket.port(), options.hub_address);
         let client_thread = thread::spawn(move || {
             client.start_worker()
         });

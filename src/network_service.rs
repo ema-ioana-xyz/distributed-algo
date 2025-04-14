@@ -65,7 +65,9 @@ impl NetworkService {
 
         match queue.send(to_be_added) {
             Ok(_) => {},
-            Err(err) => panic!("[{:?}] Could not add received message to internal queue", connection.local_addr())
+            Err(err) => panic!(
+                "[{:?}] Could not add received message to internal queue; {}",
+                connection.local_addr(), err)
         };
     }
 
@@ -128,7 +130,7 @@ impl NetworkService {
         connection.read_i32::<NetworkEndian>().expect("TODO: yeah, handle this some day") as u32
     }
 
-    fn wrap_envelope_contents<T>(contents: T) -> Option<Box<T>> {
+    pub fn wrap_envelope_contents<T>(contents: T) -> Option<Box<T>> {
         Option::from(Box::from(contents))
     }
 }
