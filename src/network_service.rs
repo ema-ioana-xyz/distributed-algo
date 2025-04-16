@@ -7,6 +7,7 @@ use std::time::Duration;
 use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
 use prost::bytes::{Bytes, BytesMut};
 use prost::Message;
+use uuid::Uuid;
 use crate::{protobuf, Envelope};
 use crate::protobuf::message::Type;
 
@@ -85,14 +86,15 @@ impl NetworkService {
         network_message.sender_listening_port = reply_port as i32;
         network_message.sender_host = "127.0.0.1".to_string();
 
-        let mut to_be_sent = protobuf::Message::default();
-        to_be_sent.set_type(Type::NetworkMessage);
-        to_be_sent.network_message = Self::wrap_envelope_contents(network_message);
-        to_be_sent.system_id = message.system_id;
-        to_be_sent.to_abstraction_id = message.to_abstraction_id;
+        let mut network_message_wrapper = Envelope::default();
+        network_message_wrapper.set_type(Type::NetworkMessage);
+        network_message_wrapper.network_message = Self::wrap_envelope_contents(network_message);
+        network_message_wrapper.system_id = message.system_id;
+        network_message_wrapper.to_abstraction_id = message.to_abstraction_id;
+        network_message_wrapper.message_uuid = Uuid::new_v4().to_string();
 
         // Actually send the message
-        Self::write(destination, &*to_be_sent.encode_to_vec())
+        Self::write(destination, &*network_message_wrapper.encode_to_vec())
     }
     fn write(destination: &SocketAddr, message: &[u8]) {
         let mut connection = match TcpStream::connect_timeout(

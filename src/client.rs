@@ -4,6 +4,7 @@ use crate::protobuf::ProcessId;
 use crate::{protobuf, Envelope};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::mpsc::{Receiver, Sender};
+use uuid::Uuid;
 
 pub struct Client {
     rx: Receiver<Envelope>,
@@ -80,6 +81,7 @@ impl Client {
             wrapped_pl_send.system_id = self.system_id.clone();
             wrapped_pl_send.to_abstraction_id = format!("{}.beb", message.to_abstraction_id);
             wrapped_pl_send.set_type(Type::PlSend);
+            wrapped_pl_send.message_uuid = Uuid::new_v4().to_string();
 
             self.handle_pl_send(wrapped_pl_send);
         }
@@ -105,14 +107,7 @@ impl Client {
         app_value_wrapper.app_value = Option::from(value);
         app_value_wrapper.to_abstraction_id = "app".to_string();
         app_value_wrapper.set_type(Type::AppValue);
-
-        // let mut broadcast_message = protobuf::BebBroadcast::default();
-        // broadcast_message.message = NetworkService::wrap_envelope_contents(app_value_wrapper);
-        //
-        // let mut broadcast_wrapper = Envelope::default();
-        // broadcast_wrapper.beb_broadcast = NetworkService::wrap_envelope_contents(broadcast_message);
-        // broadcast_wrapper.to_abstraction_id = "app".to_string();
-        // broadcast_wrapper.set_type(Type::BebBroadcast);
+        app_value_wrapper.message_uuid = Uuid::new_v4().to_string();
 
         self.do_beb_broadcast(app_value_wrapper);
     }
@@ -128,6 +123,7 @@ impl Client {
         let mut pl_send_wrapper = Envelope::default();
         pl_send_wrapper.pl_send = NetworkService::wrap_envelope_contents(pl_send);
         pl_send_wrapper.set_type(Type::PlSend);
+        pl_send_wrapper.message_uuid = Uuid::new_v4().to_string();
 
         self.handle_pl_send(pl_send_wrapper);
     }
