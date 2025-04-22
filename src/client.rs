@@ -5,6 +5,7 @@ use crate::{protobuf, Envelope};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::mpsc::{Receiver, Sender};
 use uuid::Uuid;
+use crate::register_manager::RegisterManager;
 
 pub struct Client {
     rx: Receiver<Envelope>,
@@ -12,12 +13,15 @@ pub struct Client {
     own_port: u16,
     hub_socket: SocketAddr,
     nodes: Vec<ProcessId>,
-    system_id: String
+    system_id: String,
+    register_mgr: RegisterManager,
 }
 
 impl Client {
     pub fn new(rx: Receiver<Envelope>, tx: Sender<Envelope>, own_port: u16, hub_socket: SocketAddr) -> Self {
-        Client { rx, tx, own_port, nodes: vec![], system_id: String::new(), hub_socket}
+        Client { rx, tx, own_port, nodes: vec![],
+            system_id: String::new(), hub_socket, register_mgr: RegisterManager::new()
+        }
     }
 
     pub fn start_worker(&mut self) {
@@ -42,27 +46,6 @@ impl Client {
         }
     }
 
-    fn handle_pl_deliver(&mut self, message: Envelope) {
-        // Unwrap and recurse
-        let inner = message.pl_deliver.unwrap().message.unwrap();
-        let inner = *inner;
-        self.handle_message(inner);
-    }
-
-    fn handle_pl_send(&self, message: Envelope) {
-        let mut to_be_sent = message.clone();
-        to_be_sent.to_abstraction_id = format!("{}.pl", message.to_abstraction_id);
-        to_be_sent.system_id = self.system_id.clone();
-
-        let destination_data = message.clone()
-            .pl_send.unwrap()
-            .destination.unwrap();
-        let destination_ip: Ipv4Addr = destination_data.host.parse().unwrap();
-        let destination_port = destination_data.port as u16;
-        let destination_socket = SocketAddr::new(IpAddr::V4(destination_ip), destination_port);
-
-        NetworkService::send(&destination_socket, to_be_sent, self.own_port);
-    }
 
     fn handle_beb_deliver(&mut self, message: Envelope) {
         let inner = message.beb_deliver.unwrap().message.unwrap();

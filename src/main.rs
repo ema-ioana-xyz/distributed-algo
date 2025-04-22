@@ -1,6 +1,7 @@
 mod network_service;
-mod messaging;
 mod client;
+mod register_manager;
+mod perfect_link_manager;
 
 use std::{env, thread};
 use std::net::SocketAddr;
