@@ -94,7 +94,7 @@ fn make_connection_message(index: u8, destination: &SocketAddr) -> Envelope {
 }
 fn show_usage_info() {
     println!("Usage");
-    println!("dp-algo <Hub IP address>:<Hub port>");
+    println!("dp-algo <Hub IP address>:<Hub port> <Node-1 IP>:<Node-1 port> <Node-2 IP>:<Node-2 port> <Node-3 IP>:<Node-3 port>");
 }
 
 fn set_config() -> Options {

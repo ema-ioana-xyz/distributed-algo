@@ -3,24 +3,32 @@ use crate::Envelope;
 use crate::network_service::NetworkService;
 use crate::protobuf::ProcessId;
 
-struct PlManager {
-    pub most_recent_sender: ProcessId,
-    system_id: String,
+pub struct PerfectLinkManager {
+    most_recent_sender: ProcessId,
     own_port: u16
 }
 
-impl PlManager {
-    pub fn handle_pl_deliver(&mut self, message: Envelope) {
-        // Unwrap and recurse
-        let inner = message.pl_deliver.unwrap().message.unwrap();
-        let inner = *inner;
-        self.handle_message(inner);
+impl PerfectLinkManager {
+    pub fn new(my_port: u16) -> Self {
+        PerfectLinkManager {
+            most_recent_sender: ProcessId::default(),
+            own_port: my_port
+        }
+    }
+    
+    pub fn get_most_recent_sender(&self) -> &ProcessId {
+        &self.most_recent_sender
     }
 
-    pub fn handle_pl_send(&self, message: Envelope) {
+    pub fn handle_pl_deliver(&mut self, message: Envelope) -> Envelope {
+        let inner = message.pl_deliver.unwrap().message.unwrap();
+        *inner
+    }
+
+    pub fn handle_pl_send(&self, message: Envelope, my_system_id: &str) {
         let mut to_be_sent = message.clone();
         to_be_sent.to_abstraction_id = format!("{}.pl", message.to_abstraction_id);
-        to_be_sent.system_id = self.system_id.clone();
+        to_be_sent.system_id = my_system_id.to_string();
 
         let destination_data = message.clone()
             .pl_send.unwrap()

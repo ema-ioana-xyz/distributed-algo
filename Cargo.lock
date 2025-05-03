@@ -48,6 +48,7 @@ dependencies = [
  "byteorder",
  "prost",
  "prost-build",
+ "regex",
  "uuid",
 ]
 

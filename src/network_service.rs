@@ -62,7 +62,7 @@ impl NetworkService {
         to_be_added.pl_deliver = Self::wrap_envelope_contents(pl_deliver);
         to_be_added.set_type(Type::PlDeliver);
 
-        println!("Got message: {}", to_be_added.message_uuid);
+        println!("Got message: {:?}", to_be_added);
 
         match queue.send(to_be_added) {
             Ok(_) => {},
