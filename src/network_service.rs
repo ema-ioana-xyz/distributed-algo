@@ -52,17 +52,24 @@ impl NetworkService {
 
         let payload = match net_msg.message {
             Some(val) => val,
-            None => panic!("Message from {:?} has a NetworkMessage but contains no inner message", connection.peer_addr())
+            None => panic!("Message from {}:{} has a NetworkMessage but contains no inner message",
+                           net_msg.sender_host, net_msg.sender_listening_port)
         };
 
         let mut pl_deliver = protobuf::PlDeliver::default();
         pl_deliver.message = Option::from(payload);
+        pl_deliver.sender = Option::from(protobuf::ProcessId {
+            host: net_msg.sender_host,
+            port: net_msg.sender_listening_port,
+            ..Default::default()
+        });
 
         let mut to_be_added = Envelope::default();
         to_be_added.pl_deliver = Self::wrap_envelope_contents(pl_deliver);
         to_be_added.set_type(Type::PlDeliver);
+        to_be_added.to_abstraction_id = envelope.to_abstraction_id;
 
-        println!("Got message: {:?}", to_be_added);
+        // println!("Got message: {:?}", to_be_added);
 
         match queue.send(to_be_added) {
             Ok(_) => {},

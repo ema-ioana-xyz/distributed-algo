@@ -2,6 +2,7 @@ mod network_service;
 mod client;
 mod register_manager;
 mod perfect_link_manager;
+mod broadcast_manager;
 
 use std::{env, thread};
 use std::net::SocketAddr;
